@@ -16,6 +16,8 @@ EXPECTED_NPROC_PER_NODE = {
     "deepseek-v3-671b-eagle3-online.yaml": 8,
     "gemma3-1b-eagle3-online.yaml": 1,
     "glm-5.2-dspark-disaggregated.yaml": 1,
+    "glm-5.2-dspark-offline-120k-usp.yaml": 8,
+    "glm-5.2-dspark-online-120k-usp.yaml": 8,
     "gpt-oss-120b-eagle3-online.yaml": 8,
     "gpt-oss-20b-eagle3-online.yaml": 8,
     "lfm2.5-1.2b-instruct-dflash-online.yaml": 8,
@@ -67,12 +69,18 @@ EXPECTED_NPROC_PER_NODE = {
     "qwen3.5-35b-a3b-eagle3-online.yaml": 2,
     "qwen3.5-4b-dflash-online-npu.yaml": 8,
     "qwen3.5-4b-domino-online-npu.yaml": 8,
+    "qwen3.5-9b-dspark-online-16k-usp2-ascend-smoke.yaml": 2,
     "qwen3.6-27b-dflash-disaggregated.yaml": 2,
     "qwen3.6-27b-dflash-1server-dp2-disaggregated.yaml": 2,
     "qwen3.6-27b-dflash-multiserver-disaggregated.yaml": 2,
     "qwen3.6-27b-dflash-online.yaml": 8,
     "qwen3.6-27b-domino-online.yaml": 8,
     "qwq-32b-eagle3-online.yaml": 4,
+}
+
+EXPECTED_USP_ULYSSES_SIZE = {
+    "glm-5.2-dspark-online-120k-usp.yaml": 8,
+    "qwen3.5-9b-dspark-online-16k-usp2-ascend-smoke.yaml": 2,
 }
 
 LOCAL_MOONCAKE_ENDPOINTS = {
@@ -291,7 +299,7 @@ def _recipes() -> dict[str, Path]:
 class ExampleLaunchTopologyTest(unittest.TestCase):
     def test_every_recipe_has_the_explicit_golden_topology(self):
         recipes = _recipes()
-        self.assertEqual(len(EXPECTED_NPROC_PER_NODE), 62)
+        self.assertEqual(len(EXPECTED_NPROC_PER_NODE), 65)
         self.assertEqual(set(recipes), set(EXPECTED_NPROC_PER_NODE))
 
         for filename, nproc_per_node in EXPECTED_NPROC_PER_NODE.items():
@@ -353,6 +361,13 @@ class ExampleLaunchTopologyTest(unittest.TestCase):
             with self.subTest(config=filename):
                 config = Config.from_file(str(path))
                 self.assertEqual(config.training.tp_size, 1)
+                if filename in EXPECTED_USP_ULYSSES_SIZE:
+                    self.assertEqual(
+                        config.training.sp_ulysses_size,
+                        EXPECTED_USP_ULYSSES_SIZE[filename],
+                    )
+                    self.assertEqual(config.training.sp_ring_size, 1)
+                    continue
                 if config.deployment.mode != "disaggregated":
                     continue
                 self.assertEqual(config.training.role, "auto")

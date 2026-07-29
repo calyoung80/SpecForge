@@ -1,0 +1,74 @@
+# Isolated validation profile for SpecForge PR #728 online DSpark Ulysses SP.
+# Host 116 topology: SGLang target NPU 7, producer NPU 6, consumer NPUs 0-1.
+model:
+  target_model_path: /mnt/hcs/models/Qwen3.5-9B
+  draft_model_config: /mnt/hcs/y00917737/cal_specforge/SpecForge/configs/qwen3.5-9b-dspark.json
+  target_backend: sglang
+  trust_remote_code: true
+  embedding_key: model.language_model.embed_tokens.weight
+  lm_head_key: lm_head.weight
+  mask_token_id: 248070
+  torch_dtype: bfloat16
+  sglang_attention_backend: ascend
+  sglang_context_length: 16391
+  sglang_mem_fraction_static: 0.70
+
+data:
+  train_data_path: /mnt/hcs/y00917737/dspark_long_context/qwen35-9b/inputs/16k-followup-train-16-20260728.jsonl
+  max_length: 16384
+  # PR #728 multiplies consumer accumulation by SP size, so two input refs
+  # are required for one DP=1/SP=2 optimizer step.
+  max_prompts: 2
+  chat_template: qwen3.5
+  build_dataset_num_proc: 1
+  dataloader_num_workers: 0
+  cache_dir: /mnt/hcs/y00917737/dspark_long_context/qwen35-9b/online-usp2-16k-smoke-116-20260729/cache
+
+training:
+  strategy: dspark
+  num_epochs: 1
+  max_steps: 1
+  total_steps: 1
+  batch_size: 1
+  accumulation_steps: 1
+  learning_rate: 6.0e-4
+  warmup_ratio: 0.0
+  max_grad_norm: 1.0
+  attention_backend: usp
+  sp_ulysses_size: 2
+  sp_ring_size: 1
+  fsdp_sharding: FULL_SHARD
+  num_anchors: 186
+  loss_decay_gamma: 7.0
+  objective_chunk_blocks: 128
+  save_interval: 1
+  log_interval: 1
+  dist_timeout: 180
+  seed: 42
+
+tracking:
+  report_to: none
+
+runtime:
+  producer_lease: 1
+  in_flight_high_watermark: 2
+  in_flight_low_watermark: 2
+
+run_id: qwen3.5-9b-dspark-online-usp2-16k-smoke-116-20260729
+output_dir: /mnt/hcs/y00917737/dspark_long_context/qwen35-9b/online-usp2-16k-smoke-116-20260729/consumer
+
+deployment:
+  mode: disaggregated
+  trainer:
+    nnodes: 1
+    nproc_per_node: 2
+  disaggregated:
+    control_dir: /mnt/hcs/y00917737/dspark_long_context/qwen35-9b/online-usp2-16k-smoke-116-20260729/control
+    consumer_state_dir: /mnt/hcs/y00917737/dspark_long_context/qwen35-9b/online-usp2-16k-smoke-116-20260729/consumer-state
+    backend: mooncake
+    server_urls:
+      - http://127.0.0.1:43128
+    mooncake_metadata_server: http://127.0.0.1:45890/metadata
+    mooncake_master_server_addr: 127.0.0.1:45561
+    mooncake_local_hostname: 127.0.0.1
+    mooncake_protocol: tcp
